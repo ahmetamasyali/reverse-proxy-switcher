@@ -35,7 +35,7 @@ func main() {
 	startServers()
 
 	http.HandleFunc("/switchServer", switchServer)
-	http.HandleFunc("/start", startServersHandler)
+	http.HandleFunc("/", serveMainPage)
 
 	log.Fatal(http.ListenAndServe(":9090", nil))
 }
@@ -43,6 +43,15 @@ func main() {
 func startServersHandler(w http.ResponseWriter, r *http.Request) {
 	startServers()
 	fmt.Fprintf(w, "servers started", r.URL.Path[1:])
+}
+
+func serveMainPage(w http.ResponseWriter, r *http.Request) {
+	fmt.Println(r.URL.Path)
+	p := "." + r.URL.Path
+	if p == "./" {
+		p = "./static/index.html"
+	}
+	http.ServeFile(w, r, p)
 }
 
 func startServers(){
@@ -78,7 +87,7 @@ func switchServer(w http.ResponseWriter, r *http.Request) {
 		killAllProxyServers()
 		startServers()
 
-		fmt.Fprintf(w, "Server %s switched to %s", serverName, newServerValue)
+		fmt.Fprintf(w, "%s", newServerValue)
 	}
 }
 

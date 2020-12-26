@@ -1,0 +1,67 @@
+<html lang="en">
+<head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+
+    <title>Reverse Proxy Switcher</title>
+</head>
+<body>
+<h1 style="margin-left:100px;margin-top:50px">Reverse Proxy Switcher</h1>
+
+<div class="input-group" style="margin-left:200px;margin-top:50px">
+    <div class="input-group-append" id="button-addon4">
+        <button class="btn btn-outline-secondary" id="switchUrl" type="button">Switch Url</button>
+    </div>
+</div>
+
+<div style="max-width:600px">
+    <h3 style="margin-left:100px;margin-top:50px"> localhost:9091 is transferred to : <span id="urlValue">https://jsonplaceholder.typicode.com/posts</span></h3>
+</div>
+<br><br>
+
+<div class="input-group" style="margin-left:200px;margin-top:50px">
+    <div class="input-group-append" id="button-addon4">
+        <button class="btn btn-outline-secondary" id="tryServerButton" type="button">Try localhost:9091</button>
+    </div>
+</div>
+
+<div style="max-width:600px">
+    <h3 style="margin-left:100px;margin-top:50px">Response : <span id="responseValue"></span></h3>
+</div>
+<!-- Optional JavaScript -->
+<!-- jQuery first, then Popper.js, then Bootstrap JS -->
+<script src="https://code.jquery.com/jquery-3.1.1.min.js">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+<script>
+    $( document ).ready(function() {
+        $("#switchUrl").click(function( event ) {
+            event.preventDefault();
+            $("#responseValue").text("");
+            $.ajax({
+                method: "GET",
+                url: "http://localhost:9090/switchServer?serverName=postComment"
+            })
+                .done(function( msg ) {
+                    $("#urlValue").text(msg);
+                });
+        });
+        $("#tryServerButton").click(function( event ) {
+            event.preventDefault();
+            $("#responseValue").text("");
+            $.ajax({
+                method: "GET",
+                url: "http://localhost:9091/1"
+            })
+                .done(function( msg ) {
+                    $("#responseValue").text(JSON.stringify(msg));
+                });
+        });
+    });
+</script>
+</body>
+</html>
