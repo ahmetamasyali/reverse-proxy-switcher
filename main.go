@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/labstack/echo"
 	"log"
@@ -10,39 +11,43 @@ import (
 	"strings"
 )
 
-var echos [1] *echo.Echo
-
-var firstUrlValueMap= map[string]string{
-	"postComment": "https://jsonplaceholder.typicode.com/posts",
+type ReverseProxy struct {
+	Name string
+	RemoteUrl  string
+	LocalUrl string
+	Port string
+	CurrentValue int //1 for remote, -1 for local, 0 for nothing
+	IsLocalRunning bool
 }
 
-var secondUrlValueMap = map[string]string{
-	"postComment": "https://jsonplaceholder.typicode.com/comments",
-}
+var reverseProxies = []ReverseProxy {
+	{
+		Name:           "Server 1",
+		RemoteUrl:     "https://jsonplaceholder.typicode.com/posts",
+		LocalUrl:       "https://jsonplaceholder.typicode.com/comments",
+		Port:           ":9091",
+		CurrentValue:   1,
+		IsLocalRunning: false,
 
-var serverPortMap = map[string]string{
-	"postComment": ":9091",
+	},
+	{
+		Name:           "Server 2",
+		RemoteUrl:     "https://jsonplaceholder.typicode.com/comments",
+		LocalUrl:       "https://jsonplaceholder.typicode.com/posts",
+		Port:           ":9092",
+		CurrentValue:   1,
+		IsLocalRunning: false,
+	},
 }
-
-//1 for first value, 2 for second value, 0 for nothing
-var currentServerValues = map[string]int{
-	"postComment": 1,
-}
+var echos [3] *echo.Echo
 
 func main() {
-
-
-	startServers()
-
-	http.HandleFunc("/switchServer", switchServer)
+	startReverseProxies()
 	http.HandleFunc("/", serveMainPage)
+	http.HandleFunc("/switchReverseProxyServer", switchReverseProxyServer)
+	http.HandleFunc("/serverList", serverListHandler)
 
 	log.Fatal(http.ListenAndServe(":9090", nil))
-}
-
-func startServersHandler(w http.ResponseWriter, r *http.Request) {
-	startServers()
-	fmt.Fprintf(w, "servers started", r.URL.Path[1:])
 }
 
 func serveMainPage(w http.ResponseWriter, r *http.Request) {
@@ -54,64 +59,82 @@ func serveMainPage(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, p)
 }
 
-func startServers(){
-	var index = 0
-	for  serverName, value := range currentServerValues {
-		if value == 1 {
-			echos[index] = runProxyServer(firstUrlValueMap[serverName], serverPortMap[serverName])
-			index++
-		} else if value == 2{
-			echos[index] = runProxyServer(secondUrlValueMap[serverName], serverPortMap[serverName])
-			index++
+func serverListHandler(w http.ResponseWriter, r *http.Request) {
+	for  index , reverseProxy := range reverseProxies {
+		_, err := http.Get(reverseProxy.LocalUrl)
+		if err != nil {
+			reverseProxies[index].IsLocalRunning = false
+		} else {
+			reverseProxies[index].IsLocalRunning = true
 		}
-
 	}
+
+	data, err := json.Marshal(reverseProxies)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+	fmt.Fprintf(w, string(data))
 }
 
-func switchServer(w http.ResponseWriter, r *http.Request) {
+
+func switchReverseProxyServer(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		return
+	}
+
 	serverName := r.FormValue("serverName")
 
 	if len(serverName) == 0{
 		return
 	}
 
-	if _, ok := currentServerValues[serverName]; ok {
-		var newServerValue = ""
-		if currentServerValues[serverName] == 1{
-			currentServerValues[serverName] = 2
-			newServerValue = secondUrlValueMap[serverName]
-		} else if currentServerValues[serverName] == 2{
-			currentServerValues[serverName] = 1
-			newServerValue = firstUrlValueMap[serverName]
+	for  index , reverseProxy := range reverseProxies {
+		if reverseProxy.Name == serverName {
+			var newServerValue = ""
+			reverseProxies[index].CurrentValue = reverseProxies[index].CurrentValue * -1
+			if reverseProxies[index].CurrentValue == 1{
+				newServerValue = reverseProxy.RemoteUrl
+			} else if reverseProxies[index].CurrentValue == -1 {
+				newServerValue = reverseProxy.LocalUrl
+			}
+			killAllReverseProxyServers()
+			startReverseProxies()
+			fmt.Fprintf(w, "%s", newServerValue)
 		}
-		killAllProxyServers()
-		startServers()
-
-		fmt.Fprintf(w, "%s", newServerValue)
 	}
 }
 
-func killServers(w http.ResponseWriter, r *http.Request) {
-	killAllProxyServers()
-	fmt.Fprintf(w, "Servers are killed", r.URL.Path[1:])
+func startReverseProxies(){
+	var index = 0
+	for  _ , reverseProxy := range reverseProxies {
+		if reverseProxy.CurrentValue == 1 {
+			echos[index] = runReverseProxyServer(reverseProxy.RemoteUrl, reverseProxy.Port)
+			index++
+		} else if reverseProxy.CurrentValue == -1{
+			echos[index] = runReverseProxyServer(reverseProxy.LocalUrl, reverseProxy.Port)
+			index++
+		}
+
+	}
 }
 
-func killAllProxyServers() {
+func killAllReverseProxyServers() {
 	for _, echo := range echos {
-		 if echo != nil {
-			 echo.Close()
-		 }
+		if echo != nil {
+			echo.Close()
+		}
 	}
 }
 
-func runProxyServer(targetUrl string, targetPort string) *echo.Echo {
+func runReverseProxyServer(targetUrl string, targetPort string) *echo.Echo {
 	e := echo.New()
 
 	// create the reverse proxy
 	url, _ := url.Parse(targetUrl)
 	proxy := httputil.NewSingleHostReverseProxy(url)
 
-		reverseProxyRoutePrefix := ""
+	reverseProxyRoutePrefix := ""
 	routerGroup := e.Group(reverseProxyRoutePrefix)
 	routerGroup.Use(func(handlerFunc echo.HandlerFunc) echo.HandlerFunc {
 		return func(context echo.Context) error {

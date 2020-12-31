@@ -5,63 +5,134 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 
     <!-- Bootstrap CSS -->
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"
+          integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
 
     <title>Reverse Proxy Switcher</title>
 </head>
 <body>
-<h1 style="margin-left:100px;margin-top:50px">Reverse Proxy Switcher</h1>
+<div id="root"></div>
+<script type="text/babel">
+    class SwitchContainer extends React.Component {
+        constructor(props) {
+            super(props);
+            this.state = {
+                error: null,
+                items: []
+            };
+            this.reloadReverseProxies = this.reloadReverseProxies.bind(this);
+        }
 
-<div class="input-group" style="margin-left:200px;margin-top:50px">
-    <div class="input-group-append" id="button-addon4">
-        <button class="btn btn-outline-secondary" id="switchUrl" type="button">Switch Url</button>
-    </div>
-</div>
+        reloadReverseProxies() {
+            fetch("/serverList")
+                .then(res => res.json())
+                .then(
+                    (result) => {
+                        this.setState({
+                            items: result
+                        });
+                    }, (error) => {
+                        this.setState({
+                            error
+                        });
+                    }
+                )
+        }
+        componentDidMount() {
+            this.reloadReverseProxies()
+        }
+        render() {
+            const error = this.state.error;
+            const titleStyle = {
+                margin:"50px 0 0 200px"
+            };
+            const reloadButtonStyle = {
+                margin:"50px 0 50px 300px"
+            };
+            const proxyContainerStyle = {
+                margin:"0 0 0 120px"
+            };
+            if (!error) {
+                return (
+                    <div>
+                        <h1 style={titleStyle}>Reverse Proxy Switcher</h1>
+                        <button style={reloadButtonStyle} className="btn btn-warning" onClick={this.reloadReverseProxies}
+                                type="button">Reload
+                        </button>
+                        <ul style={proxyContainerStyle}>
+                            {this.state.items.map((item, index) => (
+                                <ReverseProxySwitch name={item.Name} reloadHandler={this.reloadReverseProxies} currentValue={item.CurrentValue} isLocalRunning={item.IsLocalRunning} key={index}/>
+                            ))}
+                        </ul>
+                    </div>
+                );
+            } else {
+                return (
+                    <div>
+                        <h1>Error!</h1>
+                    </div>
+                )
+            }
+        }
+    }
+    class ReverseProxySwitch extends React.Component {
 
-<div style="max-width:600px">
-    <h3 style="margin-left:100px;margin-top:50px"> localhost:9091 is transferred to : <span id="urlValue">https://jsonplaceholder.typicode.com/posts</span></h3>
-</div>
-<br><br>
+        constructor(props){
+            super(props);
+            this.switchServer = this.switchServer.bind(this);
+        }
 
-<div class="input-group" style="margin-left:200px;margin-top:50px">
-    <div class="input-group-append" id="button-addon4">
-        <button class="btn btn-outline-secondary" id="tryServerButton" type="button">Try localhost:9091</button>
-    </div>
-</div>
+        switchServer() {
+            const requestOptions = {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            };
+            fetch('/switchReverseProxyServer?serverName=' + this.props.name, requestOptions)
+                .then(data => this.props.reloadHandler());
+        }
 
-<div style="max-width:600px">
-    <h3 style="margin-left:100px;margin-top:50px">Response : <span id="responseValue"></span></h3>
-</div>
-<!-- Optional JavaScript -->
-<!-- jQuery first, then Popper.js, then Bootstrap JS -->
-<script src="https://code.jquery.com/jquery-3.1.1.min.js">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
-<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
-<script>
-    $( document ).ready(function() {
-        $("#switchUrl").click(function( event ) {
-            event.preventDefault();
-            $("#responseValue").text("");
-            $.ajax({
-                method: "GET",
-                url: "http://localhost:9090/switchServer?serverName=postComment"
-            })
-                .done(function( msg ) {
-                    $("#urlValue").text(msg);
-                });
-        });
-        $("#tryServerButton").click(function( event ) {
-            event.preventDefault();
-            $("#responseValue").text("");
-            $.ajax({
-                method: "GET",
-                url: "http://localhost:9091/1"
-            })
-                .done(function( msg ) {
-                    $("#responseValue").text(JSON.stringify(msg));
-                });
-        });
-    });
+        render() {
+            const componentStyle = {
+                margin:"10px 0 0 0"
+            };
+
+            const titleStyle = {
+                margin:"5px 20px 0 0"
+            };
+
+            const localButtonStyle = {
+                margin:"0 10px 0 0"
+            };
+            return (
+
+                <div style={componentStyle} className="input-group">
+                    <span style={titleStyle}>{this.props.name} ({this.props.currentValue === 1 ? "Remote" : "Local"})</span>
+                    <div className="btn-group" id="button-addon4">
+                        <button disabled={this.props.currentValue !== 1 || !this.props.isLocalRunning} style={localButtonStyle} className="btn btn-primary" onClick={this.switchServer}
+                                type="button">Local {!this.props.isLocalRunning? "(Not Working)" : ""}
+                        </button>
+
+                        <button  disabled={this.props.currentValue === 1} className="btn btn-success"  onClick={this.switchServer}
+                                 id="switchUrl" type="button">Remote Server
+                        </button>
+                    </div>
+                </div>
+            )
+        }
+    }
+
+    ReactDOM.render(
+        <SwitchContainer />,
+        document.getElementById("root")
+    );
 </script>
+
+<script src="https://code.jquery.com/jquery-3.1.1.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"
+        integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM"
+        crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react@16/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@16/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/babel-standalone@6.15.0/babel.min.js"></script>
 </body>
 </html>
